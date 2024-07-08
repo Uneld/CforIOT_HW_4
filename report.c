@@ -6,58 +6,57 @@
 #include "temp_function.h"
 #include "temp_interact_mode.h"
 #include "time.h"
-
 #include "MQTTClient.h"
 
-//~ #define ADDRESS     "tcp://localhost:1883"
-//~ #define ADDRESS     "mqtt.eclipseprojects.io:1883"
-// #define ADDRESS     "192.168.100.10:1883"
+// Определяем константы
+#define CLIENTID "ExampleClientPub" // Идентификатор клиента для подключения к MQTT
+#define TOPIC "/node-red/temp"      // Топик для публикации данных температуры
+#define PAYLOAD "32"                // Payload для публикации (по умолчанию "Hello World!")
+#define QOS 1                       // Качество обслуживания для публикации
+#define TIMEOUT 10000L              // Таймаут для публикации
 
-#define CLIENTID "ExampleClientPub"
-#define TOPIC "/node-red/temp"
-#define PAYLOAD "32"
-//~ #define PAYLOAD     "Hello World!"
-#define QOS 1
-#define TIMEOUT 10000L
-#define SET_BIT(REG, BIT) ((REG) = (REG) | (BIT))
-#define READ_BIT(REG, BIT) ((REG) & (BIT))
-#define USERNAME_OFFSET 0
-#define PASSWWORD_OFFSET 1
-#define ADDRESS_OFFSET 2
-#define SEND_PERMISSION 0b111
+#define SET_BIT(REG, BIT) ((REG) = (REG) | (BIT)) // Битовая операция установки
+#define READ_BIT(REG, BIT) ((REG) & (BIT))        // Битовая операция чтения
+#define USERNAME_OFFSET 0                         // Смещение для имени пользователя в флагах разрешения
+#define PASSWWORD_OFFSET 1                        // Смещение для пароля в флагах разрешения
+#define ADDRESS_OFFSET 2                          // Смещение для адреса в флагах разрешения
+#define SEND_PERMISSION 0b111                     // Флаги разрешения для отправки сообщений MQTT
 
-int sendMqttPermission = 0;
-double DELAY = 5;
+int sendMqttPermission = 0; // Флаги разрешения для отправки сообщений MQTT
+double DELAY = 5;           // Задержка между отправкой сообщений MQTT
 
+// Определяем структуры для данных температуры и статистики
 struct TemperatureData records[MAX_RECORDS_PER_MONTH * MAX_MONTHS];
 struct MonthlyStatistics monthlyStatistics[MAX_RECORDS_PER_MONTH * MAX_MONTHS];
 struct YearlyStatistics yearlyStatistics;
 
 int main(int argc, char *argv[])
 {
+    // Инициализируем клиент MQTT и опции подключения
     MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
     MQTTClient_deliveryToken token;
     int rc;
 
+    // Обрабатываем параметры командной строки
     const char *PASS_FILE_EXTENSION = ".csv";
     char PORT[] = ":1883";
-
     char *filename = NULL;
     char *extension = NULL;
-
     char *saveFilename = NULL;
     int month = 0;
     int opt = 0;
     int numEntries;
     char ADDRESS[30] = "";
 
+    // обрабатываем аргументы командной строки
     while ((opt = getopt(argc, argv, "hf:m:s:iu:p:c:")) != -1)
     {
 
         switch (opt)
         {
+        // Печатаем сообщение помощи
         case 'h':
             printf("This program calculates the statistics of temperature data in a CSV file.\n");
             printf("-f filename.csv: the input file to process (required)\n");
@@ -70,30 +69,37 @@ int main(int argc, char *argv[])
             printf("-c address: the address to connect to the MQTT broker\n");
 
             return 0;
+        // Обрабатываем параметр имени файла
         case 'f':
             filename = optarg;
             break;
+        // Обрабатываем параметр месяца
         case 'm':
             month = atoi(optarg);
             break;
+        // Обрабатываем параметр сохранения файла
         case 's':
             saveFilename = optarg;
             break;
+        // Переходим в интерактивный режим
         case 'i':
             printf("Welcome to interactive mode\n");
             showInteractMenu();
 
             return 0;
+        // Обрабатываем параметр имени пользователя для MQTT брокера
         case 'u':
             printf("username: %s \n", optarg);
             conn_opts.username = optarg;
             SET_BIT(sendMqttPermission, (1 << USERNAME_OFFSET));
             break;
+        // Обрабатываем параметр пароля для MQTT брокера
         case 'p':
             printf("password: %s \n", optarg);
             conn_opts.password = optarg;
             SET_BIT(sendMqttPermission, (1 << PASSWWORD_OFFSET));
             break;
+        // Обрабатываем параметр адреса для MQTT брокера
         case 'c':
             printf("ADDRESS: %s \n", optarg);
             strcpy(ADDRESS, optarg);
@@ -107,6 +113,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    // Проверяем, указан ли входной файл
     if (filename == NULL)
     {
         printf("This program calculates the statistics of temperature data in a CSV file.\n");
@@ -122,15 +129,18 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Проверяем, является ли месяц корректным
     if (month < 0 || month > 12)
     {
         fprintf(stderr, "Wrong input month. Please try again.\n");
         return 1;
     }
 
+    // Парсим файл CSV и рассчитываем статистику
     numEntries = parseCSVFile(filename, records);
     calculateStatistics(records, numEntries, monthlyStatistics, &yearlyStatistics);
 
+    // Выводим статистику в зависимости от указанного месяца или вывод полной
     if (month == 0)
     {
         showMonthlyStatistics(stdout, monthlyStatistics);
@@ -141,6 +151,7 @@ int main(int argc, char *argv[])
         showMonthStatistics(stdout, monthlyStatistics, month);
     }
 
+    // сохраняем статистику в файл, если указан
     if (saveFilename != NULL)
     {
         FILE *fo = fopen(saveFilename, "w");
@@ -158,6 +169,7 @@ int main(int argc, char *argv[])
         fclose(fo);
     }
 
+    // Проверяем, указаны ли все необходимые параметры для отправки сообщений MQTT
     if (!READ_BIT(sendMqttPermission, (1 << USERNAME_OFFSET)))
     {
         printf("Username no entered\n");
@@ -173,6 +185,7 @@ int main(int argc, char *argv[])
         printf("Addres no entered\n");
     }
 
+    // Отправляем сообщения MQTT, если указаны все необходимые параметры
     if (sendMqttPermission == SEND_PERMISSION)
     {
         strcat(ADDRESS, PORT);

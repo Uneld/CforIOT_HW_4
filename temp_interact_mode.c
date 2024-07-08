@@ -11,17 +11,19 @@ extern struct YearlyStatistics yearlyStatistics;
 
 void showInteractMenu()
 {
+    // Определение констант для расширения файла и максимальной длины имени файла
     const char *PASS_FILE_EXTENSION = ".csv";
-
     char *extension = NULL;
     char filename[MAX_LEN_FILENAME];
     char saveFilename[MAX_LEN_FILENAME];
 
+    // Инициализация переменных для ввода и статистики
     int numEntries = 0;
     int choice = 0;
 
     do
     {
+        // Отображение интерактивного меню пользователю
         printf("\nMenu:\n");
         printf("1. Open file\n");
         printf("2. Show statistics for all months\n");
@@ -36,9 +38,11 @@ void showInteractMenu()
         switch (choice)
         {
         case 1:
+            // Открытие файла
             printf("Enter file name: ");
             scanf("%s", filename);
 
+            // Проверка расширения файла
             extension = strrchr(filename, '.');
             if (extension == NULL || strcmp(extension, PASS_FILE_EXTENSION) != 0)
             {
@@ -46,6 +50,7 @@ void showInteractMenu()
                 continue;
             }
 
+            // Парсинг файла и расчет статистики
             numEntries = parseCSVFile(filename, records);
             if (numEntries != -1)
             {
@@ -58,18 +63,22 @@ void showInteractMenu()
         case 3:
         case 4:
         case 5:
+            // Проверка, был ли открыт файл
             if (numEntries == 0)
             {
                 fprintf(stderr, "Input file is required. Please open file.\n");
                 continue;
             }
 
+            // Обработка выбора пользователя
             switch (choice)
             {
             case 2:
+                // Показать статистику для всех месяцев
                 showMonthlyStatistics(stdout, monthlyStatistics);
                 break;
             case 3:
+                // Показать статистику для одного месяца
                 printf("Select month: ");
                 int month = 0;
                 scanf("%d", &month);
@@ -82,9 +91,11 @@ void showInteractMenu()
                 showMonthStatistics(stdout, monthlyStatistics, month);
                 break;
             case 4:
+                // Показать статистику для года
                 showYearlyStatistics(stdout, &yearlyStatistics);
                 break;
             case 5:
+                // Сохранить статистику в файл
                 printf("Enter file name: ");
                 scanf("%s", saveFilename);
 
@@ -99,9 +110,11 @@ void showInteractMenu()
 
             break;
         case 0:
+            // Выход из программы
             printf("The program is completed.\n");
             break;
         default:
+            // Неправильный ввод
             printf("Invalid selection. Try again.\n");
         }
     } while (choice != 0);
